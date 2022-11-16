@@ -34,7 +34,7 @@ OBJS = \
   $K/list.o
 
 # uncomment for lab net
-#OBJS += \
+OBJS += \
   $K/net.o \
   $K/virtio_net.o \
   $(LWIP)/core/init.o \
@@ -208,7 +208,7 @@ ifndef CPUS
 CPUS := 3
 endif
 
-QEMUEXTRA = 
+QEMUEXTRA =
 QEMUOPTS = -machine virt -global virtio-mmio.force-legacy=false
 QEMUOPTS += -bios none -kernel $K/kernel -m 128M -smp $(CPUS) -nographic
 QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
