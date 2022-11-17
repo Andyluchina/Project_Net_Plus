@@ -37,6 +37,8 @@ kvminit()
   // virtio mmio net interface
   kvmmap(VIRTIO1, VIRTIO1, PGSIZE, PTE_R | PTE_W);
 
+  // CLINT_MTIME
+  kvmmap(CLINT_MTIME, CLINT_MTIME, 64, PTE_R | PTE_W);
   // PLIC
   kvmmap(PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
