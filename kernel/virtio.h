@@ -46,6 +46,9 @@
 #define VIRTIO_RING_F_INDIRECT_DESC 28
 #define VIRTIO_RING_F_EVENT_IDX     29
 
+// network device feature bits
+#define VIRTIO_NET_F_MAC 5
+
 // a single descriptor, from the spec.
 struct virtq_desc {
   uint64 addr;
