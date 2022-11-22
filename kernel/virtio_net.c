@@ -31,7 +31,28 @@ struct virtio_net_config {
 };
 
 
-struct network {
+struct transmitq {
+  // The descriptor table tells the device where to read and write
+  // individual disk operations.
+  struct virtq_desc *desc;
+  // The available ring is where the driver writes descriptor numbers
+  // that the driver would like the device to process (just the head
+  // of each chain). The ring has NUM elements.
+  struct virtq_avail *avail;
+  // The used ring is where the device writes descriptor numbers that
+  // the device has finished processing (just the head of each chain).
+  // The ring has NUM elements.
+  struct virtq_used *used;
+
+
+  // // disk command headers.
+  // // one-for-one with descriptors, for convenience.
+  // struct virtio_blk_req ops[NUM];
+  
+  struct spinlock vtransmitq_lock;
+} transmitq;
+
+struct receiveq {
   // The descriptor table tells the device where to read and write
   // individual disk operations.
   struct virtq_desc *desc;
@@ -60,8 +81,8 @@ struct network {
   // // one-for-one with descriptors, for convenience.
   // struct virtio_blk_req ops[NUM];
   
-  struct spinlock vdisk_lock;
-} network;
+  struct spinlock vreceiveq_lock;
+} receiveq;
 
 
 
@@ -74,6 +95,27 @@ struct virtio_net_hdr {
   uint16 csum_offset;
   uint16 num_buffers;
 };
+
+// find a free descriptor, mark it non-free, return its index.
+// static int
+// alloc_desc(void)
+// {
+//   for(int i = 0; i < NUM; i++){
+//     if(disk.free[i]){
+//       disk.free[i] = 0;
+//       return i;
+//     }
+//   }
+//   return -1;
+// }
+
+// // a single descriptor, from the spec.
+// struct virtq_desc {
+//   uint64 addr;
+//   uint32 len;
+//   uint16 flags;
+//   uint16 next;
+// };
 
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
