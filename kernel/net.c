@@ -114,7 +114,6 @@ netinit(void)
 {
   lwip_init();
   netadd();
-  printf("made it here!");
   netif_set_default(&netif);
 }
 
