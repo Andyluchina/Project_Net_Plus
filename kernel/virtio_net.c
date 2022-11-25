@@ -47,6 +47,9 @@ struct transmitq {
   // The ring has NUM elements.
   struct virtq_used *used;
 
+  // our own book-keeping.
+  char free[NUM];  // is a descriptor free?
+  uint16 used_idx; // we've looked this far in used->ring.
 
   // // disk command headers.
   // // one-for-one with descriptors, for convenience.
@@ -68,9 +71,9 @@ struct receiveq {
   // The ring has NUM elements.
   struct virtq_used *used;
 
-  // // our own book-keeping.
-  // char free[NUM];  // is a descriptor free?
-  // uint16 used_idx; // we've looked this far in used->ring.
+  // our own book-keeping.
+  char free[NUM];  // is a descriptor free?
+  uint16 used_idx; // we've looked this far in used->ring.
 
   // // track info about in-flight operations,
   // // for use when completion interrupt arrives.
@@ -179,6 +182,58 @@ void virtio_net_init(void *mac) {
   status = *R(VIRTIO_MMIO_STATUS);
   if(!(status & VIRTIO_CONFIG_S_FEATURES_OK))
     panic("virtio network FEATURES_OK unset");
+
+  // Initialize queue 0: the receive virtqueue.
+  *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
+  if(*R(VIRTIO_MMIO_QUEUE_READY))
+    panic("virtio net receive queue ready not zero");
+  uint32 max0 = *R(VIRTIO_MMIO_QUEUE_NUM_MAX);
+  if(max0 == 0)
+    panic("virtio net has no queue 0");
+  if(max0 < NUM)
+    panic("virtio net max receive queue too short");
+  *R(VIRTIO_MMIO_QUEUE_NUM) = NUM;
+
+  *R(VIRTIO_MMIO_QUEUE_DESC_LOW)   = (uint64)receiveq.desc;
+  *R(VIRTIO_MMIO_QUEUE_DESC_HIGH)  = (uint64)receiveq.desc >> 32;
+  *R(VIRTIO_MMIO_DRIVER_DESC_LOW)  = (uint64)receiveq.avail;
+  *R(VIRTIO_MMIO_DRIVER_DESC_HIGH) = (uint64)receiveq.avail >> 32;
+  *R(VIRTIO_MMIO_DEVICE_DESC_LOW)  = (uint64)receiveq.used;
+  *R(VIRTIO_MMIO_DEVICE_DESC_HIGH) = (uint64)receiveq.used >> 32;
+
+  /* Queue ready. */
+  *R(VIRTIO_MMIO_QUEUE_READY) = 0x1;
+
+  // all NUM descriptors start out unused.
+  for(int i = 0; i < NUM; i++)
+    receiveq.free[i] = 1;
+  
+  
+  // Initialize queue 0: the receive virtqueue.
+  *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
+  if(*R(VIRTIO_MMIO_QUEUE_READY))
+    panic("virtio net transmit queue ready not zero");
+  uint32 max1 = *R(VIRTIO_MMIO_QUEUE_NUM_MAX);
+  if(max1 == 0)
+    panic("virtio net has no queue 0");
+  if(max1 < NUM)
+    panic("virtio net max transmit queue too short");
+  *R(VIRTIO_MMIO_QUEUE_NUM) = NUM;
+
+  *R(VIRTIO_MMIO_QUEUE_DESC_LOW)   = (uint64)transmitq.desc;
+  *R(VIRTIO_MMIO_QUEUE_DESC_HIGH)  = (uint64)transmitq.desc >> 32;
+  *R(VIRTIO_MMIO_DRIVER_DESC_LOW)  = (uint64)transmitq.avail;
+  *R(VIRTIO_MMIO_DRIVER_DESC_HIGH) = (uint64)transmitq.avail >> 32;
+  *R(VIRTIO_MMIO_DEVICE_DESC_LOW)  = (uint64)transmitq.used;
+  *R(VIRTIO_MMIO_DEVICE_DESC_HIGH) = (uint64)transmitq.used >> 32;
+
+  /* Queue ready. */
+  *R(VIRTIO_MMIO_QUEUE_READY) = 0x1;
+
+  // all NUM descriptors start out unused.
+  for(int i = 0; i < NUM; i++)
+    receiveq.free[i] = 1;
+
 
   // read data from the device configuration space
   struct virtio_net_config * config = (struct virtio_net_config *)R(VIRTIO_MMIO_CONFIG);
