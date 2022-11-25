@@ -120,7 +120,37 @@ struct virtio_net_hdr {
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
   uint32 status = 0;
-  struct virtio_net_config * config;
+
+  // Initialize the transmit virtqueue and receive virtqueue
+  initlock(&transmitq.vtransmitq_lock, "virtio_net_transmit");
+  initlock(&receiveq.vreceiveq_lock, "virtio_net_receive");
+ 
+  transmitq.desc = kalloc();
+  transmitq.avail = kalloc();
+  transmitq.used = kalloc();
+  if(!transmitq.desc || !transmitq.avail || !transmitq.used)
+    panic("virtio net transmitq kalloc");
+  memset(transmitq.desc, 0, PGSIZE);
+  memset(transmitq.avail, 0, PGSIZE);
+  memset(transmitq.used, 0, PGSIZE);
+
+  receiveq.desc = kalloc();
+  receiveq.avail = kalloc();
+  receiveq.used = kalloc();
+  if(!receiveq.desc || !receiveq.avail || !receiveq.used)
+    panic("virtio net receiveq kalloc");
+  memset(receiveq.desc, 0, PGSIZE);
+  memset(receiveq.avail, 0, PGSIZE);
+  memset(receiveq.used, 0, PGSIZE);
+
+  // Check the device ID and MMIO version information
+  if(*R(VIRTIO_MMIO_MAGIC_VALUE) != 0x74726976 ||
+     *R(VIRTIO_MMIO_VERSION) != 2 ||
+     *R(VIRTIO_MMIO_DEVICE_ID) != 1 ||
+     *R(VIRTIO_MMIO_VENDOR_ID) != 0x554d4551){
+    panic("could not find virtio net");
+  }
+
   // Reset the device.
   *R(VIRTIO_MMIO_STATUS) = status;
 
@@ -147,22 +177,17 @@ void virtio_net_init(void *mac) {
   if(!(status & VIRTIO_CONFIG_S_FEATURES_OK))
     panic("virtio network FEATURES_OK unset");
 
-  // read device configuration space
-  config = (struct virtio_net_config *)R(VIRTIO_MMIO_CONFIG);
-  // printf("here we have %d\n", config -> mac);
+  // read data from the device configuration space
+  struct virtio_net_config * config = (struct virtio_net_config *)R(VIRTIO_MMIO_CONFIG);
+
+  // Set the MAC address from the device configuration space which is 52:54:00:12:34:56
+  for(int i = 0; i < 6; i++){
+    ((uint8 *)mac)[i] = config->mac[i];
+  }
 
   // Tell device we're completely ready.
   status |= VIRTIO_CONFIG_S_DRIVER_OK;
   *R(VIRTIO_MMIO_STATUS) = status;
-// 52:54:00:12:34:56
-
-  // mac = config->mac;
-  // mac = (uint8 **)mac;
-  for(int i = 0; i<6; i++){
-    // printf("here we have %x\n", mac[i]);
-    ((uint8 *)mac)[i] = config->mac[i];
-    // (uint8 *) mac += 1;
-  }
 
 }
 
