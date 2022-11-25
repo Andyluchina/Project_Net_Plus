@@ -11,6 +11,9 @@
 
 // the address of virtio mmio register r.
 #define R(r) ((volatile uint32 *)(VIRTIO1 + (r)))
+// this many virtio descriptors.
+// must be a power of two.
+#define NUM 8
 // flags
 #define VIRTIO_NET_HDR_F_NEEDS_CSUM 1
 #define VIRTIO_NET_HDR_F_DATA_VALID 2
