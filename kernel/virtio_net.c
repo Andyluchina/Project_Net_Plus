@@ -394,5 +394,5 @@ int virtio_net_recv(void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
 
   release(&receiveq.vreceiveq_lock);
-  return 0; // FIXME
+  return 0;
 }
