@@ -93,47 +93,48 @@ struct receiveq {
 
 
 
-// // find a free descriptor, mark it non-free, return its index.
-// static int
-// alloc_desc_receiveq(void)
-// {
-//   for(int i = 0; i < NUM; i++){
-//     if(receiveq.free[i]){
-//       receiveq.free[i] = 0;
-//       return i;
-//     }
-//   }
-//   return -1;
-// }
+// find a free descriptor, mark it non-free, return its index.
+static int
+alloc_desc_receiveq(void)
+{
+  for(int i = 0; i < NUM; i++){
+    if(receiveq.free[i]){
+      receiveq.free[i] = 0;
+      return i;
+    }
+  }
+  return -1;
+}
 
-// static int
-// alloc2_desc_receiveq(int *idx)
-// {
-//   for(int i = 0; i < 2; i++){
-//     idx[i] = alloc_desc_receiveq();
-//     if(idx[i] < 0){
-//       for(int j = 0; j < i; j++)
-//         free_desc_receiveq(idx[j]);
-//       return -1;
-//     }
-//   }
-//   return 0;
-// }
+// mark a descriptor as free.
+static void
+free_desc_receiveq(int i)
+{
+  if(i >= NUM)
+    panic("virtio_disk_intr 1");
+  if(receiveq.free[i])
+    panic("virtio_disk_intr 2");
+  receiveq.desc[i].addr = 0;
+  receiveq.free[i] = 1;
+  wakeup(&receiveq.free[0]);
+}
+
+static int
+alloc2_desc_receiveq(int *idx)
+{
+  for(int i = 0; i < 2; i++){
+    idx[i] = alloc_desc_receiveq();
+    if(idx[i] < 0){
+      for(int j = 0; j < i; j++)
+        free_desc_receiveq(idx[j]);
+      return -1;
+    }
+  }
+  return 0;
+}
 
 
 
-// // mark a descriptor as free.
-// static void
-// free_desc_receiveq(int i)
-// {
-//   if(i >= NUM)
-//     panic("virtio_disk_intr 1");
-//   if(receiveq.free[i])
-//     panic("virtio_disk_intr 2");
-//   receiveq.desc[i].addr = 0;
-//   receiveq.free[i] = 1;
-//   wakeup(&receiveq.free[0]);
-// }
 
 // find a free descriptor, mark it non-free, return its index.
 static int
@@ -353,5 +354,45 @@ int virtio_net_send(const void *data, int len) {
 /* receive data; return the number of bytes received */
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
+  *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
+  acquire(&receiveq.vreceiveq_lock);
+  int idx[2];
+  while(1){
+    if (alloc2_desc_receiveq(idx) == 0){
+      break;
+    }
+    sleep(&receiveq.free[0], &receiveq.vreceiveq_lock);
+  } 
+
+  // Format the two desciptors.
+  struct virtio_net_hdr * hdr = &receiveq.ops[idx[0]];
+  hdr->flags = 0;
+  hdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
+  hdr->num_buffers = 1;
+  hdr->hdr_len = sizeof(struct virtio_net_hdr);
+  hdr->gso_size = 1526;
+  hdr->csum_start = 0;
+  hdr->csum_offset = 0;
+
+  receiveq.desc[idx[0]].addr = (uint64) hdr;
+  receiveq.desc[idx[0]].len = sizeof(struct virtio_net_hdr);
+  receiveq.desc[idx[0]].flags = VIRTQ_DESC_F_NEXT;
+  receiveq.desc[idx[0]].next = idx[1];
+
+  receiveq.desc[idx[1]].addr = (uint64) data;
+  receiveq.desc[idx[1]].len = len;
+  receiveq.desc[idx[1]].flags = VIRTQ_DESC_F_WRITE;
+  receiveq.desc[idx[1]].next = 0;
+
+  // avail->idx tells the device how far to look in avail->ring.
+  // avail->ring[...] are desc[] indices the device should process.
+  // we only tell device the first index in our chain of descriptors.
+  receiveq.avail->ring[receiveq.avail->idx % NUM] = idx[0];
+  __sync_synchronize();
+  receiveq.avail->idx += 1;
+
+  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+
+  release(&receiveq.vreceiveq_lock);
   return 0; // FIXME
 }
