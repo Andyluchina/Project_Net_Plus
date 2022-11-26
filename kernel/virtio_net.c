@@ -36,7 +36,7 @@ struct virtio_net_config {
 
 struct transmitq {
   // The descriptor table tells the device where to read and write
-  // individual disk operations.
+  // individual net operations.
   struct virtq_desc *desc;
   // The available ring is where the driver writes descriptor numbers
   // that the driver would like the device to process (just the head
@@ -51,16 +51,16 @@ struct transmitq {
   char free[NUM];  // is a descriptor free?
   uint16 used_idx; // we've looked this far in used->ring.
 
-  // // disk command headers.
-  // // one-for-one with descriptors, for convenience.
-  // struct virtio_blk_req ops[NUM];
+  // net command headers.
+  // one-for-one with descriptors, for convenience.
+  struct virtio_net_hdr ops[NUM];
   
   struct spinlock vtransmitq_lock;
 } transmitq;
 
 struct receiveq {
   // The descriptor table tells the device where to read and write
-  // individual disk operations.
+  // individual net operations.
   struct virtq_desc *desc;
   // The available ring is where the driver writes descriptor numbers
   // that the driver would like the device to process (just the head
@@ -83,9 +83,9 @@ struct receiveq {
   //   char status;
   // } info[NUM];
 
-  // // disk command headers.
-  // // one-for-one with descriptors, for convenience.
-  // struct virtio_blk_req ops[NUM];
+  // net command headers.
+  // one-for-one with descriptors, for convenience.
+  struct virtio_net_hdr ops[NUM];
   
   struct spinlock vreceiveq_lock;
 } receiveq;
@@ -103,25 +103,57 @@ struct virtio_net_hdr {
 };
 
 // find a free descriptor, mark it non-free, return its index.
-// static int
-// alloc_desc(void)
-// {
-//   for(int i = 0; i < NUM; i++){
-//     if(disk.free[i]){
-//       disk.free[i] = 0;
-//       return i;
-//     }
-//   }
-//   return -1;
-// }
+static int
+alloc_desc_receiveq(void)
+{
+  for(int i = 0; i < NUM; i++){
+    if(receiveq.free[i]){
+      receiveq.free[i] = 0;
+      return i;
+    }
+  }
+  return -1;
+}
 
-// // a single descriptor, from the spec.
-// struct virtq_desc {
-//   uint64 addr;
-//   uint32 len;
-//   uint16 flags;
-//   uint16 next;
-// };
+// mark a descriptor as free.
+static void
+free_desc_receiveq(int i)
+{
+  if(i >= NUM)
+    panic("virtio_disk_intr 1");
+  if(receiveq.free[i])
+    panic("virtio_disk_intr 2");
+  receiveq.desc[i].addr = 0;
+  receiveq.free[i] = 1;
+  wakeup(&receiveq.free[0]);
+}
+
+// find a free descriptor, mark it non-free, return its index.
+static int
+alloc_desc_transmitq(void)
+{
+  for(int i = 0; i < NUM; i++){
+    if(transmitq.free[i]){
+      transmitq.free[i] = 0;
+      return i;
+    }
+  }
+  return -1;
+}
+
+// mark a descriptor as free.
+static void
+free_desc_transmitq(int i)
+{
+  if(i >= NUM)
+    panic("virtio_disk_intr 1");
+  if(transmitq.free[i])
+    panic("virtio_disk_intr 2");
+  transmitq.desc[i].addr = 0;
+  transmitq.free[i] = 1;
+  wakeup(&transmitq.free[0]);
+}
+
 
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
@@ -250,11 +282,42 @@ void virtio_net_init(void *mac) {
 }
 
 /* send data; return 0 on success */
+// The driver adds outgoing (device readable) packets to the transmit virtqueue, and then frees them after they are used.
 int virtio_net_send(const void *data, int len) {
+  acquire(&transmitq.vtransmitq_lock);
+  int idx;
+  while(1){
+    idx = alloc_desc_receiveq();
+    if (idx < 0){
+      sleep(&transmitq.free[0], &transmitq.vtransmitq_lock);
+    }
+  } 
+
+  struct virtio_net_hdr * hdr = &transmitq.ops[idx];
+  hdr->flags = 0;
+  hdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
+  hdr->num_buffers = 0; // unused filed on transmitted packets
+
+  transmitq.desc[idx].addr = (uint64) hdr;
+  transmitq.desc[idx].len = sizeof(struct virtio_net_hdr);
+  transmitq.desc[idx].flags = 0;
+  transmitq.desc[idx].next = 0;
+
+  // avail->idx tells the device how far to look in avail->ring.
+  // avail->ring[...] are desc[] indices the device should process.
+  // we only tell device the first index in our chain of descriptors.
+  transmitq.avail->ring[transmitq.avail->idx % NUM] = idx;
+  __sync_synchronize();
+  transmitq.avail->idx += 1;
+
+  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
+
+  release(&transmitq.vtransmitq_lock);
   return 0; // FIXME
 }
 
 /* receive data; return the number of bytes received */
+// Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
   return 0; // FIXME
 }
