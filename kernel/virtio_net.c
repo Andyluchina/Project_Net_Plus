@@ -345,7 +345,7 @@ int virtio_net_send(const void *data, int len) {
   __sync_synchronize();
   transmitq.avail->idx += 1;
 
-  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
 
   release(&transmitq.vtransmitq_lock);
   return 0;
