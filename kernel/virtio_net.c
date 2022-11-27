@@ -134,9 +134,6 @@ alloc2_desc_receiveq(int *idx)
   return 0;
 }
 
-
-
-
 // find a free descriptor, mark it non-free, return its index.
 static int
 alloc_desc_transmitq(void)
@@ -179,14 +176,12 @@ alloc2_desc_transmitq(int *idx)
 }
 
 
-
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
   uint32 status = 0;
 
-  // Initialize the transmit virtqueue and receive virtqueue
+  // Initialize the transmit virtqueue
   initlock(&transmitq.vtransmitq_lock, "virtio_net_transmit");
-  initlock(&receiveq.vreceiveq_lock, "virtio_net_receive");
  
   transmitq.desc = kalloc();
   transmitq.avail = kalloc();
@@ -196,6 +191,9 @@ void virtio_net_init(void *mac) {
   memset(transmitq.desc, 0, PGSIZE);
   memset(transmitq.avail, 0, PGSIZE);
   memset(transmitq.used, 0, PGSIZE);
+
+  // Initialize the receive virtqueue
+  initlock(&receiveq.vreceiveq_lock, "virtio_net_receive");
 
   receiveq.desc = kalloc();
   receiveq.avail = kalloc();
@@ -290,9 +288,8 @@ void virtio_net_init(void *mac) {
   *R(VIRTIO_MMIO_QUEUE_READY) = 0x1;
 
   // all NUM descriptors start out unused.
-  for(int i = 0; i < NUM; i++){
+  for(int i = 0; i < NUM; i++)
     transmitq.free[i] = 1;
-  }
 
 
   // read data from the device configuration space
@@ -371,8 +368,6 @@ int virtio_net_recv(void *data, int len) {
   int idx[2];
   struct proc *p = myproc();
   printf("process info: PID = %d\n", p);
-  printf("\n");
-  printf("\n");
   while(1){    
     printf("receiveq.free[0] = %d\n", receiveq.free[0]);
     printf("&receiveq.free[0] = %p\n", &receiveq.free[0]);
@@ -380,6 +375,8 @@ int virtio_net_recv(void *data, int len) {
       printf("Yes got the descriptors!\n");
       break;
     }
+    printf("\n");
+    printf("\n");
     printf("The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
     printf("receiveq.free[0] = %d\n", receiveq.free[0]);
     printf("&receiveq.free[0] = %p\n", &receiveq.free[0]);
