@@ -176,6 +176,33 @@ alloc2_desc_transmitq(int *idx)
 }
 
 
+// free a chain of descriptors.
+static void
+free_chain_transmitq(int i)
+{
+  while(1){
+    free_desc_transmitq(i);
+    if(transmitq.desc[i].flags & VIRTQ_DESC_F_NEXT)
+      i = transmitq.desc[i].next;
+    else
+      break;
+  }
+}
+
+// free a chain of descriptors.
+static void
+free_chain_receiveq(int i)
+{
+  while(1){
+    free_desc_receiveq(i);
+    if(receiveq.desc[i].flags & VIRTQ_DESC_F_NEXT)
+      i = receiveq.desc[i].next;
+    else
+      break;
+  }
+}
+
+
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
   uint32 status = 0;
@@ -310,11 +337,7 @@ void virtio_net_init(void *mac) {
 // The driver adds outgoing (device readable) packets to the transmit virtqueue, and then frees them after they are used.
 int virtio_net_send(const void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
-  // printf("The address of lock is %p.\n", &transmitq.vtransmitq_lock);
-  // printf("01 The locked value is %d.\n", transmitq.vtransmitq_lock.locked);
-  // printf("The lock name is %s.\n", transmitq.vtransmitq_lock.name);
   acquire(&transmitq.vtransmitq_lock);
-  // printf("02 The locked value is %d.\n", transmitq.vtransmitq_lock.locked);
   int idx[2];
   while(1){
     if (alloc2_desc_transmitq(idx) == 0){
@@ -360,26 +383,13 @@ int virtio_net_send(const void *data, int len) {
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
-  // printf("The address of lock is %p.\n", &receiveq.vreceiveq_lock);
-  // printf("01 The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
-  // printf("The lock name is %s.\n", receiveq.vreceiveq_lock.name);
   acquire(&receiveq.vreceiveq_lock);
-  // printf("02 The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
   int idx[2];
-  struct proc *p = myproc();
-  printf("process info: PID = %d\n", p);
   while(1){    
-    printf("receiveq.free[0] = %d\n", receiveq.free[0]);
-    printf("&receiveq.free[0] = %p\n", &receiveq.free[0]);
     if (alloc2_desc_receiveq(idx) == 0){
       printf("Yes got the descriptors!\n");
       break;
     }
-    printf("\n");
-    printf("\n");
-    printf("The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
-    printf("receiveq.free[0] = %d\n", receiveq.free[0]);
-    printf("&receiveq.free[0] = %p\n", &receiveq.free[0]);
     sleep(&receiveq.free[0], &receiveq.vreceiveq_lock);
   } 
 
@@ -389,9 +399,9 @@ int virtio_net_recv(void *data, int len) {
   hdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
   hdr->num_buffers = 1;
   hdr->hdr_len = sizeof(struct virtio_net_hdr);
-  hdr->gso_size = 0;
+  hdr->gso_size = 1526;
   hdr->csum_start = 0;
-  hdr->csum_offset = 0;
+  hdr->csum_offset = 1526;
 
   receiveq.desc[idx[0]].addr = (uint64) hdr;
   receiveq.desc[idx[0]].len = sizeof(struct virtio_net_hdr);
@@ -409,8 +419,15 @@ int virtio_net_recv(void *data, int len) {
   receiveq.avail->ring[receiveq.avail->idx % NUM] = idx[0];
   __sync_synchronize();
   receiveq.avail->idx += 1;
-
+ 
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+  int receive_len = 0;
+  int id = receiveq.used->ring[receiveq.used_idx].id;
+  if (id == idx[0]){
+    receive_len = receiveq.used->ring[receiveq.used_idx].len;
+    __sync_synchronize();
+    receiveq.used_idx = (receiveq.used_idx + 1) % NUM;
+  }
 
   release(&receiveq.vreceiveq_lock);
   return len;
