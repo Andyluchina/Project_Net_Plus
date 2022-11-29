@@ -134,6 +134,7 @@ free_desc_receiveq(int i)
 //   return 0;
 // }
 
+
 // find a free descriptor, mark it non-free, return its index.
 static int
 alloc_desc_transmitq(void)
@@ -160,6 +161,7 @@ free_desc_transmitq(int i)
   wakeup(&transmitq.free[0]);
 }
 
+
 // free a chain of descriptors.
 static void
 free_chain_transmitq(int i)
@@ -185,6 +187,7 @@ free_chain_receiveq(int i)
       break;
   }
 }
+
 
 static int
 alloc2_desc_transmitq(int *idx)
@@ -309,7 +312,6 @@ void virtio_net_init(void *mac) {
   *R(VIRTIO_MMIO_DRIVER_DESC_HIGH) = (uint64)transmitq.avail >> 32;
   *R(VIRTIO_MMIO_DEVICE_DESC_LOW)  = (uint64)transmitq.used;
   *R(VIRTIO_MMIO_DEVICE_DESC_HIGH) = (uint64)transmitq.used >> 32;
-
   /* Queue ready. */
   *R(VIRTIO_MMIO_QUEUE_READY) = 0x1;
 
@@ -335,7 +337,9 @@ void virtio_net_init(void *mac) {
 /* send data; return 0 on success */
 // The driver adds outgoing (device readable) packets to the transmit virtqueue, and then frees them after they are used.
 int virtio_net_send(const void *data, int len) {
+
   // *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
+
   // printf("The address of lock is %p.\n", &transmitq.vtransmitq_lock);
   // printf("01 The locked value is %d.\n", transmitq.vtransmitq_lock.locked);
   // printf("The lock name is %s.\n", transmitq.vtransmitq_lock.name);
@@ -393,6 +397,7 @@ int virtio_net_send(const void *data, int len) {
   printf("send after1: %d\n", transmitq.used->idx);
   printf("send after2: %d\n", transmitq.used_idx);
   free_chain_transmitq(idx[0]);
+
   release(&transmitq.vtransmitq_lock);
   return 0;
 }
@@ -401,6 +406,7 @@ int virtio_net_send(const void *data, int len) {
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
   // *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
+
   // printf("The address of lock is %p.\n", &receiveq.vreceiveq_lock);
   // printf("01 The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
   // printf("The lock name is %s.\n", receiveq.vreceiveq_lock.name);
@@ -428,6 +434,7 @@ int virtio_net_recv(void *data, int len) {
 
   // Format the two desciptors.
   struct virtio_net_hdr * hdr = &receiveq.ops[idx];
+
   hdr->flags = 0;
   hdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
   hdr->num_buffers = 1;
@@ -445,6 +452,7 @@ int virtio_net_recv(void *data, int len) {
   // receiveq.desc[idx[1]].len = len;
   // receiveq.desc[idx[1]].flags = VIRTQ_DESC_F_WRITE;
   // receiveq.desc[idx[1]].next = 0;
+
 
   // avail->idx tells the device how far to look in avail->ring.
   // avail->ring[...] are desc[] indices the device should process.
