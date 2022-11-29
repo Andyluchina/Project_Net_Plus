@@ -40,10 +40,9 @@ linkinput(struct netif *netif)
   if(len > 0){
     /* shrink pbuf to actual size */
     pbuf_realloc(p, len);
-
+    // printf("made it here\n");
     if(netif->input(p, netif) == ERR_OK)
       return len;
-
     printf("linkinput: drop packet (%d bytes)\n", len);
   }
 
