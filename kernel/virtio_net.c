@@ -14,7 +14,7 @@
 #define R(r) ((volatile uint32 *)(VIRTIO1 + (r)))
 // this many virtio descriptors.
 // must be a power of two.
-#define NUM 8
+#define NUM 16
 // flags
 #define VIRTIO_NET_HDR_F_NEEDS_CSUM 1
 #define VIRTIO_NET_HDR_F_DATA_VALID 2
@@ -147,18 +147,6 @@ alloc_desc_transmitq(void)
   return -1;
 }
 
-// // free a chain of descriptors.
-// static void
-// free_chain_receiveq(int i)
-// {
-//   while(1){
-//     free_desc_receiveq(i);
-//     if(receiveq.desc[i].flags & VIRTQ_DESC_F_NEXT)
-//       i = receiveq.desc[i].next;
-//     else
-//       break;
-//   }
-// }
 // mark a descriptor as free.
 static void
 free_desc_transmitq(int i)
@@ -170,6 +158,32 @@ free_desc_transmitq(int i)
   transmitq.desc[i].addr = 0;
   transmitq.free[i] = 1;
   wakeup(&transmitq.free[0]);
+}
+
+// free a chain of descriptors.
+static void
+free_chain_transmitq(int i)
+{
+  while(1){
+    free_desc_transmitq(i);
+    if(transmitq.desc[i].flags & VIRTQ_DESC_F_NEXT)
+      i = transmitq.desc[i].next;
+    else
+      break;
+  }
+}
+
+// free a chain of descriptors.
+static void
+free_chain_receiveq(int i)
+{
+  while(1){
+    free_desc_receiveq(i);
+    if(receiveq.desc[i].flags & VIRTQ_DESC_F_NEXT)
+      i = receiveq.desc[i].next;
+    else
+      break;
+  }
 }
 
 static int
@@ -237,6 +251,7 @@ void virtio_net_init(void *mac) {
   // Negotiate features.
   uint64 features = *R(VIRTIO_MMIO_DEVICE_FEATURES);
   features &= ~(1 << VIRTIO_NET_F_MAC);
+  // features &= ~(1 << 15);
   *R(VIRTIO_MMIO_DRIVER_FEATURES) = features;
 
 
@@ -320,7 +335,7 @@ void virtio_net_init(void *mac) {
 /* send data; return 0 on success */
 // The driver adds outgoing (device readable) packets to the transmit virtqueue, and then frees them after they are used.
 int virtio_net_send(const void *data, int len) {
-  *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
+  // *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
   // printf("The address of lock is %p.\n", &transmitq.vtransmitq_lock);
   // printf("01 The locked value is %d.\n", transmitq.vtransmitq_lock.locked);
   // printf("The lock name is %s.\n", transmitq.vtransmitq_lock.name);
@@ -363,14 +378,21 @@ int virtio_net_send(const void *data, int len) {
 
   printf("send before 1: %d\n", transmitq.used->idx);
   printf("send before 2: %d\n", transmitq.used_idx);
+  *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
-  // while(transmitq.used_idx >= transmitq.used->idx){
-  //   // wait for queue to add something to used queue
-  //   // printf("waiting !!!!\n");
-  // }
-  // transmitq.used_idx = transmitq.used->idx;
+  printf("sent len: %d\n", len);
+  while(transmitq.used_idx >= transmitq.used->idx){
+    // wait for queue to add something to used queue
+    // sleep(transmitq.used, &transmitq.vtransmitq_lock);
+    *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
+    *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1;
+  }
+  transmitq.used_idx = transmitq.used->idx;
+  // transmitq.used_idx +=1;
+  // transmitq.used->idx -=1;
   printf("send after1: %d\n", transmitq.used->idx);
   printf("send after2: %d\n", transmitq.used_idx);
+  free_chain_transmitq(idx[0]);
   release(&transmitq.vtransmitq_lock);
   return 0;
 }
@@ -378,7 +400,7 @@ int virtio_net_send(const void *data, int len) {
 /* receive data; return the number of bytes received */
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
-  *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
+  // *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
   // printf("The address of lock is %p.\n", &receiveq.vreceiveq_lock);
   // printf("01 The locked value is %d.\n", receiveq.vreceiveq_lock.locked);
   // printf("The lock name is %s.\n", receiveq.vreceiveq_lock.name);
@@ -435,42 +457,43 @@ int virtio_net_recv(void *data, int len) {
   printf("before 2: %d\n", receiveq.used_idx);
   // uint16 idx_of_used;
   // idx_of_used = receiveq.used->idx;
+  *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-  
-  while(receiveq.used_idx >= receiveq.used->idx){
+  // printf("stuck or what\n");
+  int counter = 0;
+  while(receiveq.used_idx == receiveq.used->idx){
     // wait for queue to add something to used queue
     // printf("waiting !!!!\n");
+    *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
+    *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+    counter++;
+    if(counter > 1000){
+      break;
+    }
   }
   printf("after1: %d\n", receiveq.used->idx);
   printf("after2: %d\n", receiveq.used_idx);
   // receiveq.avail->idx -= 1;
-  uint32 desc_id_used = receiveq.used->ring[receiveq.used_idx].id;
-  // uint32 desc_id_used = receiveq.used->ring[receiveq.used->idx].id;
-  // uint32 desc_id_used = receiveq.used->ring[2].id;
-  printf("desc used is %d\n", desc_id_used);
+  // uint32 desc_id_used = receiveq.used->ring[receiveq.used_idx % NUM].id;
+  // // uint32 desc_id_used = receiveq.used->ring[receiveq.used->idx].id;
+  // // uint32 desc_id_used = receiveq.used->ring[2].id;
+  // printf("desc used is %d\n", desc_id_used);
   // struct virtq_desc* desc_head = &receiveq.desc[desc_id_used];
   int actual_len = 0;
-  // do{
-  //   // desc_head.addr;
-  //  actual_len += receiveq.desc[desc_id_used].len;
-  //  desc_id_used = receiveq.desc[desc_id_used].next;
-  //  printf("added len %d\n", actual_len);
-  //   // memset(transmitq.desc, 0, PGSIZE);
-  // }while(desc_id_used !=0);
 
-  // actual_len += receiveq.desc[desc_id_used].len;
-  actual_len += receiveq.used->ring[receiveq.used_idx].len;
-  // desc_id_used = receiveq.desc[desc_id_used].next;
+ 
+  actual_len += receiveq.used->ring[receiveq.used_idx % NUM].len;
   printf("added len %d\n", actual_len);
-  free_desc_receiveq(receiveq.used->ring[receiveq.used_idx].id);
-  receiveq.used_idx = receiveq.used->idx;
-  // receiveq.used_idx ++;
+  free_chain_receiveq(receiveq.used->ring[receiveq.used_idx % NUM].id);
+  
   char* holder = (char *)data + 12;
   for(int i = 12; i<actual_len; i++){
     *((char *)data) = *holder;
     holder+=1;
     (char *)data++;
   }
+  receiveq.used_idx = receiveq.used->idx;
+  // receiveq.used_idx++;
   // uint16 r = 65535;
   // printf("%d before add 1\n", r);
   // printf("%d after add 1\n", r+1);
