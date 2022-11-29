@@ -215,3 +215,5 @@ int             nettimer(void);
 void            virtio_net_init(void *);
 int             virtio_net_send(const void *data, int len);
 int             virtio_net_recv(void *data, int len);
+void            virtio_net_intr_transmitq(void);
+void            virtio_net_intr_receiveq(void);

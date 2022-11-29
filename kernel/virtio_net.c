@@ -52,6 +52,14 @@ struct transmitq {
   char free[NUM];  // is a descriptor free?
   uint16 used_idx; // we've looked this far in used->ring.
 
+  // track info about in-flight operations,
+  // for use when completion interrupt arrives.
+  // indexed by first descriptor index of chain.
+  struct {
+    char status;
+    int net;
+  } info[NUM];
+
   // net command headers.
   // one-for-one with descriptors, for convenience.
   struct virtio_net_hdr ops[NUM];
@@ -76,13 +84,13 @@ struct receiveq {
   char free[NUM];  // is a descriptor free?
   uint16 used_idx; // we've looked this far in used->ring.
 
-  // // track info about in-flight operations,
-  // // for use when completion interrupt arrives.
-  // // indexed by first descriptor index of chain.
-  // struct {
-  //   struct buf *b;
-  //   char status;
-  // } info[NUM];
+  // track info about in-flight operations,
+  // for use when completion interrupt arrives.
+  // indexed by first descriptor index of chain.
+  struct {
+    char status;
+    int net;
+  } info[NUM];
 
   // net command headers.
   // one-for-one with descriptors, for convenience.
@@ -121,9 +129,9 @@ free_desc_receiveq(int i)
 }
 
 static int
-alloc2_desc_receiveq(int *idx)
+alloc3_desc_receiveq(int *idx)
 {
-  for(int i = 0; i < 2; i++){
+  for(int i = 0; i < 3; i++){
     idx[i] = alloc_desc_receiveq();
     if(idx[i] < 0){
       for(int j = 0; j < i; j++)
@@ -162,9 +170,9 @@ free_desc_transmitq(int i)
 }
 
 static int
-alloc2_desc_transmitq(int *idx)
+alloc3_desc_transmitq(int *idx)
 {
-  for(int i = 0; i < 2; i++){
+  for(int i = 0; i < 3; i++){
     idx[i] = alloc_desc_transmitq();
     if(idx[i] < 0){
       for(int j = 0; j < i; j++)
@@ -338,9 +346,9 @@ void virtio_net_init(void *mac) {
 int virtio_net_send(const void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
   acquire(&transmitq.vtransmitq_lock);
-  int idx[2];
+  int idx[3];
   while(1){
-    if (alloc2_desc_transmitq(idx) == 0){
+    if (alloc3_desc_transmitq(idx) == 0){
       break;
     }
     sleep(&transmitq.free[0], &transmitq.vtransmitq_lock);
@@ -364,7 +372,17 @@ int virtio_net_send(const void *data, int len) {
   transmitq.desc[idx[1]].addr = (uint64) data;
   transmitq.desc[idx[1]].len = len;
   transmitq.desc[idx[1]].flags = 0;
-  transmitq.desc[idx[1]].next = 0;
+  transmitq.desc[idx[1]].flags |= VIRTQ_DESC_F_NEXT;
+  transmitq.desc[idx[1]].next = idx[2];
+
+  transmitq.info[idx[0]].status = 0;
+  transmitq.desc[idx[2]].addr = (uint64) &transmitq.info[idx[0]].status;
+  transmitq.desc[idx[2]].len = 1;
+  transmitq.desc[idx[2]].flags = VIRTQ_DESC_F_WRITE;   // device writes the status
+  transmitq.desc[idx[2]].next = 0;
+
+  // set the valid value for polling
+  transmitq.info[idx[0]].net = 1;
 
   // avail->idx tells the device how far to look in avail->ring.
   // avail->ring[...] are desc[] indices the device should process.
@@ -373,8 +391,16 @@ int virtio_net_send(const void *data, int len) {
   __sync_synchronize();
   transmitq.avail->idx += 1;
 
-  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
+  *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number 
 
+  // Wait for virtio_net_intr() to say request has finished.
+  while(transmitq.info[idx[0]].net == 1) {
+    // make sure the first value
+    // int chan = 1;
+    sleep(&transmitq.free[0], &transmitq.vtransmitq_lock);
+  }
+
+  free_chain_transmitq(idx[0]);
   release(&transmitq.vtransmitq_lock);
   return 0;
 }
@@ -386,8 +412,8 @@ int virtio_net_recv(void *data, int len) {
   acquire(&receiveq.vreceiveq_lock);
   int idx[2];
   while(1){    
-    if (alloc2_desc_receiveq(idx) == 0){
-      printf("Yes got the descriptors!\n");
+    if (alloc3_desc_receiveq(idx) == 0){
+      // printf("Yes got the descriptors!\n");
       break;
     }
     sleep(&receiveq.free[0], &receiveq.vreceiveq_lock);
@@ -411,7 +437,17 @@ int virtio_net_recv(void *data, int len) {
   receiveq.desc[idx[1]].addr = (uint64) data;
   receiveq.desc[idx[1]].len = len;
   receiveq.desc[idx[1]].flags = VIRTQ_DESC_F_WRITE;
-  receiveq.desc[idx[1]].next = 0;
+  receiveq.desc[idx[1]].flags |= VIRTQ_DESC_F_NEXT;
+  receiveq.desc[idx[1]].next = idx[2];
+
+  receiveq.info[idx[0]].status = 0;
+  receiveq.desc[idx[2]].addr = (uint64) &receiveq.info[idx[0]].status;
+  receiveq.desc[idx[2]].len = 1;
+  receiveq.desc[idx[2]].flags = VIRTQ_DESC_F_WRITE;   // device writes the status
+  receiveq.desc[idx[2]].next = 0;
+
+  // set the valid value for polling
+  receiveq.info[idx[0]].net = 1;
 
   // avail->idx tells the device how far to look in avail->ring.
   // avail->ring[...] are desc[] indices the device should process.
@@ -421,14 +457,66 @@ int virtio_net_recv(void *data, int len) {
   receiveq.avail->idx += 1;
  
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-  int receive_len = 0;
-  int id = receiveq.used->ring[receiveq.used_idx].id;
-  if (id == idx[0]){
-    receive_len = receiveq.used->ring[receiveq.used_idx].len;
-    __sync_synchronize();
-    receiveq.used_idx = (receiveq.used_idx + 1) % NUM;
+
+  // Wait for virtio_net_intr() to say request has finished.
+  while(receiveq.info[idx[0]].net == 1) {
+    // make sure the first value
+    // int chan = 1;
+    sleep(&receiveq.info[0].net, &receiveq.vreceiveq_lock);
   }
 
+  int receive_len = 0;
+  int id = receiveq.used->ring[receiveq.used_idx].id;
+  receive_len = receiveq.used->ring[id].len;
+  receiveq.used_idx = (receiveq.used_idx + 1) % NUM;
+
+  free_chain_receiveq(idx[0]);
+
   release(&receiveq.vreceiveq_lock);
-  return len;
+  return receive_len;
 }
+
+
+void
+virtio_net_intr_transmitq(void)
+{
+  acquire(&transmitq.vtransmitq_lock);
+
+  while((transmitq.used_idx % NUM) != (transmitq.used->idx % NUM)){
+    int id = transmitq.used->ring[transmitq.used_idx].id;
+
+    if(transmitq.info[id].status != 0)
+      panic("virtio_net_intr status");
+    
+    transmitq.info[id].net = 0;   // net receive is done
+    wakeup(&transmitq.info[0].net);
+
+    transmitq.used_idx = (transmitq.used_idx + 1) % NUM;
+  }
+  *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
+
+  release(&transmitq.vtransmitq_lock);
+}
+
+
+void
+virtio_net_intr_receiveq(void)
+{
+  acquire(&receiveq.vreceiveq_lock);
+
+  while((receiveq.used_idx % NUM) != (receiveq.used->idx % NUM)){
+    int id = receiveq.used->ring[receiveq.used_idx].id;
+
+    if(receiveq.info[id].status != 0)
+      panic("virtio_net_intr status");
+    
+    receiveq.info[id].net = 0;   // net receive is done
+    wakeup(&receiveq.info[0].net);
+
+    receiveq.used_idx = (receiveq.used_idx + 1) % NUM;
+  }
+  *R(VIRTIO_MMIO_INTERRUPT_ACK) = *R(VIRTIO_MMIO_INTERRUPT_STATUS) & 0x3;
+
+  release(&receiveq.vreceiveq_lock);
+}
+

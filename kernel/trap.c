@@ -191,6 +191,9 @@ devintr()
       uartintr();
     } else if(irq == VIRTIO0_IRQ){
       virtio_disk_intr();
+    } else if(irq == VIRTIO1_IRQ){
+      virtio_net_intr_receiveq();
+      virtio_net_intr_transmitq();
     } else {
       // the PLIC sends each device interrupt to every core,
       // which generates a lot of interrupts with irq==0.
