@@ -107,6 +107,11 @@ extern uint64 sys_uptime(void);
 extern uint64 sys_ntas(void);
 extern uint64 sys_nfree(void);
 
+// lab net
+extern uint64 sys_socket(void);
+extern uint64 sys_connect(void);
+extern uint64 sys_gethostbyname(void);
+
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -131,6 +136,9 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_ntas]    sys_ntas,
 [SYS_nfree]   sys_nfree,
+[SYS_socket]  sys_socket,
+[SYS_connect] sys_connect,
+[SYS_gethostbyname] sys_gethostbyname,
 };
 
 void
