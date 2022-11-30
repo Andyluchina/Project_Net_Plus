@@ -24,3 +24,7 @@
 // System calls for labs
 #define SYS_ntas   22
 #define SYS_nfree  23
+
+#define SYS_socket   24
+#define SYS_connect  25
+#define SYS_gethostbyname 26

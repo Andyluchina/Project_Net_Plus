@@ -560,6 +560,7 @@ sleep(void *chan, struct spinlock *lk)
   // (wakeup locks p->lock),
   // so it's okay to release lk.
   if(lk != &p->lock){  //DOC: sleeplock0
+    // printf("PID = %d\n", p->pid);
     acquire(&p->lock);  //DOC: sleeplock1
     release(lk);
   }

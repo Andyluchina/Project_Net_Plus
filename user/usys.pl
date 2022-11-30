@@ -38,3 +38,7 @@ entry("sleep");
 entry("uptime");
 entry("ntas");
 entry("nfree");
+
+entry("socket");
+entry("connect");
+entry("gethostbyname");

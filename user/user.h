@@ -1,3 +1,4 @@
+// #include "net.h"
 struct stat;
 struct rtcdate;
 
@@ -42,3 +43,9 @@ void free(void*);
 int atoi(const char*);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
+
+// net
+int socket(int, int, int);
+int connect(int, const void *, uint32);
+// int connect(int, const struct sockaddr *addr, uint32 addrlen);
+struct hostent *gethostbyname(const char*);

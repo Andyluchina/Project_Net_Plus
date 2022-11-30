@@ -71,6 +71,9 @@ virtio_disk_init(void)
   memset(disk.desc, 0, PGSIZE);
   memset(disk.avail, 0, PGSIZE);
   memset(disk.used, 0, PGSIZE);
+  
+  // printf("R(VIRTIO_MMIO_MAGIC_VALUE) = %x\n", R(VIRTIO_MMIO_MAGIC_VALUE));
+  // printf("*R(VIRTIO_MMIO_MAGIC_VALUE) = %x\n", *R(VIRTIO_MMIO_MAGIC_VALUE));
 
   if(*R(VIRTIO_MMIO_MAGIC_VALUE) != 0x74726976 ||
      *R(VIRTIO_MMIO_VERSION) != 2 ||

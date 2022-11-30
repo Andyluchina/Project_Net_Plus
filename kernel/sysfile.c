@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+// #include "lwip/sockets.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -486,3 +487,47 @@ sys_pipe(void)
   return 0;
 }
 
+uint64
+sys_socket(void)
+{
+  int domain;
+  int type;
+  int protocal;
+  
+  if(argint(0, &domain) < 0 || argint(1, &type) < 0 || argint(2, &protocal) < 0)
+    return -1;
+
+  if (VERBOSE1) printf("Calling Socket, TODO\n");
+  return 0;
+}
+
+uint64
+sys_connect(void)
+{
+  int s;
+  uint64 name;
+  int namelen;
+  
+  if(argint(0, &s) < 0 || argaddr(1, &name) < 0 || argint(2, &namelen) < 0)
+    return -1;
+  // name casting: (struct sockaddr *) name
+  // namelen casting (socklen_t) namelen
+  if (VERBOSE1) printf("Calling Connect, TODO\n");
+  return 0;
+}
+
+uint64
+sys_gethostbyname(void)
+{
+  char name[MAXPATH];
+
+  if(argstr(0, name, MAXPATH) < 0){
+    return -1;
+  }
+
+  if (VERBOSE1) printf("Calling DNS on %s, TODO\n", name);
+  
+  // TODO:
+  
+  return 0;
+}
