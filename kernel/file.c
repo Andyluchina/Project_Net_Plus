@@ -12,7 +12,8 @@
 #include "file.h"
 #include "stat.h"
 #include "proc.h"
-// #include "lwip/sockets.h"
+// #include "lwip/tcp.h"
+#include "lwip/sockets.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -133,6 +134,25 @@ fileread(struct file *f, uint64 addr, int n)
 
   return r;
 }
+
+int
+sockread(struct file *f, char *addr, int n)
+{
+  // Get the socket associated with the file.
+  struct lwip_sock *sock = (struct lwip_sock*)f->data;
+
+  // Use the lwIP raw API to read data from the socket.
+  // You may need to grab a lock before calling any lwIP
+  // functions to ensure thread safety.
+  int ret = lwip_recv(sock, addr, n, 0);
+  if (ret < 0) {
+    // Handle error case.
+    return -1;
+  }
+
+  return ret;
+}
+
 
 // Write to file f.
 // addr is a user virtual address.

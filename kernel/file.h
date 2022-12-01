@@ -6,6 +6,7 @@ struct file {
   struct pipe *pipe; // FD_PIPE
   struct inode *ip;  // FD_INODE and FD_DEVICE
   struct lwip_sock *sock; // FD_SOCK
+  void *data;
 
   uint off;          // FD_INODE and FD_DEVICE
   short major;       // FD_DEVICE

@@ -76,6 +76,10 @@ sys_read(void)
 
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
     return -1;
+  switch (f->type) {
+    case FD_SOCK:
+      return sockread(f, p, n);
+  }
   return fileread(f, p, n);
 }
 
@@ -89,6 +93,11 @@ sys_write(void)
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
     return -1;
 
+  switch (f->type) {
+    case FD_SOCK:
+      return sockwrite(f, p, n);
+  }
+
   return filewrite(f, p, n);
 }
 
@@ -101,6 +110,12 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
   myproc()->ofile[fd] = 0;
+
+  switch (f->type) {
+    case FD_SOCK:
+      return sockclose(f);
+  }
+
   fileclose(f);
   return 0;
 }
