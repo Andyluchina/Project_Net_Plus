@@ -10,6 +10,7 @@ struct stat;
 struct superblock;
 
 #define VERBOSE1 1
+// int TICKER_NET = 0;
 
 // bio.c
 void            binit(void);

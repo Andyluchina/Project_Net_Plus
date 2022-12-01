@@ -434,12 +434,15 @@ int virtio_net_recv(void *data, int len) {
   __sync_synchronize();
 
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-  int counter = 0;
+  // int counter = 0;
   while(receiveq.used_idx == receiveq.used->idx){
     // wait for queue to add something to used queue
     *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-    counter++;
-    if(counter > 1000000){
+    // counter++;
+    // if(counter > 1000000){
+    //   break;
+    // }
+    if(*(uint64*)CLINT_MTIME % 2 == 0){
       break;
     }
   }
