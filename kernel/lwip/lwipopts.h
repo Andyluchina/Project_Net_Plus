@@ -1,9 +1,13 @@
-#define NO_SYS 1
+#define NO_SYS 0
 
 #define SYS_LIGHTWEIGHT_PROT 0
 
 #define LWIP_NETCONN 0
-#define LWIP_SOCKET 0
+#define LWIP_SOCKET 1
+
+#define LWIP_COMPAT_MUTEX 1
+#define LWIP_COMPAT_MUTEX_ALLOWED 1
+#define LWIP_PROVIDE_ERRNO 1
 
 #define LWIP_ARP 1
 #define LWIP_DHCP 1
