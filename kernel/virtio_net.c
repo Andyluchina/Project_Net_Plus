@@ -207,6 +207,9 @@ alloc2_desc_transmitq(int *idx)
 
 /* initialize the NIC and store the MAC address */
 void virtio_net_init(void *mac) {
+
+  uint64 time_start =  *(uint64*)CLINT_MTIME;
+
   uint32 status = 0;
 
   // Initialize the transmit virtqueue
@@ -333,11 +336,16 @@ void virtio_net_init(void *mac) {
   status |= VIRTIO_CONFIG_S_DRIVER_OK;
   *R(VIRTIO_MMIO_STATUS) = status;
 
+  printf(" virtio_net_init EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
+
 }
 
 /* send data; return 0 on success */
 // The driver adds outgoing (device readable) packets to the transmit virtqueue, and then frees them after they are used.
 int virtio_net_send(const void *data, int len) {
+
+  uint64 time_start =  *(uint64*)CLINT_MTIME;
+
   acquire(&transmitq.vtransmitq_lock);
   int idx[2];
   while(1){
@@ -387,12 +395,17 @@ int virtio_net_send(const void *data, int len) {
   free_chain_transmitq(idx[0]);
 
   release(&transmitq.vtransmitq_lock);
+
+  printf(" virtio_net_send EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
   return 0;
 }
 
 /* receive data; return the number of bytes received */
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
+
+  uint64 time_start =  *(uint64*)CLINT_MTIME;
+
   acquire(&receiveq.vreceiveq_lock);
   int idx;
   idx = alloc_desc_receiveq();
@@ -420,15 +433,13 @@ int virtio_net_recv(void *data, int len) {
   receiveq.avail->idx += 1;
   __sync_synchronize();
 
-  *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
   int counter = 0;
   while(receiveq.used_idx == receiveq.used->idx){
     // wait for queue to add something to used queue
-    *R(VIRTIO_MMIO_QUEUE_SEL) = 0;
     *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
     counter++;
-    if(counter > 1000){
+    if(counter > 1000000){
       break;
     }
   }
@@ -447,5 +458,7 @@ int virtio_net_recv(void *data, int len) {
   receiveq.used_idx = receiveq.used->idx;
 
   release(&receiveq.vreceiveq_lock);
+
+  printf(" virtio_net_recv EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
   return actual_len-12;
 }
