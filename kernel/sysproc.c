@@ -97,40 +97,40 @@ sys_uptime(void)
   return xticks;
 }
 
-int
-sys_socket(void)
+int sys_socket(int domain, int type, int protocol)
 {
-  // Get the socket domain and type from the arguments.
-  int domain, type, protocol;
-  if (argint(0, &domain) < 0 || argint(1, &type) < 0 || argint(2, &protocol) < 0) {
-    // Handle error case.
-    return -1;
-  }
+    struct file *f;
+    struct sock *s;
+    int fd;
+    struct tcp_pcb *pcb;
 
-  // Use the lwIP raw API to create a new socket.
-  // You may need to grab a lock before calling any lwIP
-  // functions to ensure thread safety.
-  int sockfd = lwip_socket(domain, type, protocol);
-  if (sockfd < 0) {
-    // Handle error case.
-    return -1;
-  }
+    // Allocate a new file descriptor for the socket
+    if ((fd = fdalloc(0)) < 0) {
+        return -1;
+    }
 
-  // Create a new file structure for the socket.
-  struct file *f;
-  if ((f = filealloc()) == 0) {
-    // Handle error case.
-    return -1;
-  }
+    // Create a new TCP PCB using lwIP's tcp_new() function
+    if ((pcb = tcp_new()) == 0) {
+        fdclose(fd);
+        return -1;
+    }
 
-  // Set the file type to FD_SOCK, and store a pointer
-  // to the lwIP socket structure in the file's data member.
-  f->type = FD_SOCK;
-  f->data = (void*)sockfd;
+    // Allocate a new sock structure to represent the socket
+    if ((s = sockalloc()) == 0) {
+        fdclose(fd);
+        tcp_close(pcb);
+        return -1;
+    }
 
-  // Return the file descriptor for the new socket.
-  return fdalloc(f);
+    // Initialize the sock structure and store it in the file descriptor
+    s->pcb = pcb;
+    f = &filedes[fd];
+    f->type = FD_SOCK;
+    f->sock = s;
+
+    return fd;
 }
+
 
 int
 sys_connect(void)
