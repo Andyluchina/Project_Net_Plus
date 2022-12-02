@@ -11,6 +11,7 @@
 #include "virtio.h"
 
 #define DEBUGP 0
+#define TIMEP 0
 // the address of virtio mmio register r.
 #define R(r) ((volatile uint32 *)(VIRTIO1 + (r)))
 // this many virtio descriptors.
@@ -336,7 +337,7 @@ void virtio_net_init(void *mac) {
   status |= VIRTIO_CONFIG_S_DRIVER_OK;
   *R(VIRTIO_MMIO_STATUS) = status;
 
-  printf(" virtio_net_init EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
+  if (TIMEP) printf(" virtio_net_init EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
 
 }
 
@@ -396,7 +397,7 @@ int virtio_net_send(const void *data, int len) {
 
   release(&transmitq.vtransmitq_lock);
 
-  printf(" virtio_net_send EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
+  if (TIMEP) printf(" virtio_net_send EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
   return 0;
 }
 
@@ -462,6 +463,6 @@ int virtio_net_recv(void *data, int len) {
 
   release(&receiveq.vreceiveq_lock);
 
-  printf(" virtio_net_recv EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
+  if (TIMEP) printf(" virtio_net_recv EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
   return actual_len-12;
 }

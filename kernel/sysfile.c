@@ -531,3 +531,21 @@ sys_gethostbyname(void)
   
   return 0;
 }
+
+uint64
+sys_tcpcall(void)
+{
+  // char name[MAXPATH];
+  int s;
+
+  if(argint(0, &s) < 0){
+    return -1;
+  }
+
+  if (VERBOSE1) printf("Calling TCP\n");
+  // tcpallinone(s);
+  
+  // TODO:
+  
+  return 0;
+}

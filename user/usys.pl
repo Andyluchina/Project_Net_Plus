@@ -42,3 +42,4 @@ entry("nfree");
 entry("socket");
 entry("connect");
 entry("gethostbyname");
+entry("tcpcall");

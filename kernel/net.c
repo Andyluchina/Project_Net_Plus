@@ -67,8 +67,6 @@ linkinit(struct netif *netif)
 void
 netadd(void)
 {
-  uint64 time_start =  *(uint64*)CLINT_MTIME;
-
   int i;
   char addr[IPADDR_STRLEN_MAX], netmask[IPADDR_STRLEN_MAX], gw[IPADDR_STRLEN_MAX];
 
@@ -92,15 +90,10 @@ netadd(void)
 
   dhcp_start(&netif);
   /* wait until DHCP succeeds */
-  int n_start = 0;
   while(!dhcp_supplied_address(&netif)){
     linkinput(&netif);
     sys_check_timeouts();
-    n_start++;
   }
-
-  printf("net(): tried %d times\n", n_start);
-  printf("net() EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
 
   ipaddr_ntoa_r(netif_ip_addr4(&netif), addr, sizeof(addr));
   ipaddr_ntoa_r(netif_ip_netmask4(&netif), netmask, sizeof(netmask));

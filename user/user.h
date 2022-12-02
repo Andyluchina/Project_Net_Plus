@@ -49,3 +49,4 @@ int socket(int, int, int);
 int connect(int, const void *, uint32);
 // int connect(int, const struct sockaddr *addr, uint32 addrlen);
 struct hostent *gethostbyname(const char*);
+int tcpcall(int);

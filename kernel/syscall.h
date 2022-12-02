@@ -28,3 +28,4 @@
 #define SYS_socket   24
 #define SYS_connect  25
 #define SYS_gethostbyname 26
+#define SYS_tcpcall 27
