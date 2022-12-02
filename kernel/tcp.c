@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <lwip/ip_addr.h>
-#include <lwip/tcp.h>
+#include "lwip/tcp.h"
+#include "lwip/ip_addr.h"
+
+// Buffer for received data
+char buffer[1024];
+
+// Data to send to the server
+const char *request = "GET / HTTP/1.1\r\nHost: 192.168.1.100\r\n\r\n";
 
 void tcp_connected_callback(void *arg, struct tcp_pcb *tcp_pcb, err_t err)
 {
@@ -25,15 +31,38 @@ void tcp_connected_callback(void *arg, struct tcp_pcb *tcp_pcb, err_t err)
     }
 }
 
+void tcp_recv_callback(void *arg, struct tcp_pcb *tcp_pcb, struct pbuf *p, err_t err)
+{
+    // Check if there is data to process
+    if (p != NULL)
+    {
+        // Copy the received data into the buffer
+        int len = pbuf_copy_partial(p, buffer, sizeof(buffer), 0);
+
+        // Process the received data...
+
+        // Free the pbuf using the pbuf_free() function
+        pbuf_free(p);
+    }
+    else
+    {
+        // Print a message
+        printf("No more data from the server.\n");
+
+        // Close the TCP control block using the tcp_close() function
+        tcp_close(tcp_pcb);
+    }
+}
+
 
 int main()
 {
     // TCP control block and local address
     struct tcp_pcb *tcp_pcb;
-    struct ip_addr local_addr;
+    struct ip_addr_t local_addr;
 
     // Server address and port
-    struct ip_addr server_addr;
+    struct ip_addr_t server_addr;
     const char *server_ip = "192.168.1.100";
     const int server_port = 80;
 
