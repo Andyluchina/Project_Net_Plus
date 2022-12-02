@@ -543,9 +543,5 @@ sys_tcpcall(void)
   }
 
   if (VERBOSE1) printf("Calling TCP\n");
-  // tcpallinone(s);
-  
-  // TODO:
-  
-  return 0;
+  return tcpallinone(s);
 }

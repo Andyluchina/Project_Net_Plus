@@ -31,6 +31,7 @@ OBJS = \
   $K/plic.o \
   $K/virtio_disk.o \
   $K/buddy.o \
+  $K/tcpcall.o \
   $K/list.o
 
 OBJS += \
