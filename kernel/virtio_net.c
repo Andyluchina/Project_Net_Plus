@@ -404,7 +404,7 @@ int virtio_net_send(const void *data, int len) {
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
 
-  uint64 time_start =  *(uint64*)CLINT_MTIME;
+  // uint64 time_start =  *(uint64*)CLINT_MTIME;
 
   acquire(&receiveq.vreceiveq_lock);
   int idx;
@@ -434,17 +434,17 @@ int virtio_net_recv(void *data, int len) {
   __sync_synchronize();
 
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-  // int counter = 0;
+  int counter = 0;
   while(receiveq.used_idx == receiveq.used->idx){
     // wait for queue to add something to used queue
     *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
-    // counter++;
+    counter++;
     // if(counter > 1000000){
+      break;
+    // }
+    // if(*(uint64*)CLINT_MTIME % 2 == 0){
     //   break;
     // }
-    if(*(uint64*)CLINT_MTIME % 2 == 0){
-      break;
-    }
   }
   int actual_len = 0;
 
@@ -460,8 +460,9 @@ int virtio_net_recv(void *data, int len) {
   }
   receiveq.used_idx = receiveq.used->idx;
 
+  // int time_end = *(uint64*)CLINT_MTIME - time_start;
   release(&receiveq.vreceiveq_lock);
 
-  printf(" virtio_net_recv EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
+  // printf(" virtio_net_recv EXIT: time elapsed %d, cycled %d times\n", time_end, counter);
   return actual_len-12;
 }

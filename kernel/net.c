@@ -105,7 +105,7 @@ netadd(void)
   ipaddr_ntoa_r(netif_ip_addr4(&netif), addr, sizeof(addr));
   ipaddr_ntoa_r(netif_ip_netmask4(&netif), netmask, sizeof(netmask));
   ipaddr_ntoa_r(netif_ip_gw4(&netif), gw, sizeof(gw));
-  printf("net: addr %s netmask %s gw %s\n", addr, netmask, gw);
+  printf("netadd(): addr %s netmask %s gw %s\n", addr, netmask, gw);
 }
 
 int
