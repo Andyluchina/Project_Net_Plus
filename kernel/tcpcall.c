@@ -8,13 +8,16 @@
 #include "sleeplock.h"
 #include "file.h"
 // #include "lwip/dhcp.h"
-#include "lwip/etharp.h"
+// #include "lwip/etharp.h"
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/timeouts.h"
 #include "lwip/tcp.h"
+#include "lwip/tcpbase.h"
 
 #define CLOUDFAREIP "1.1.1.1"
+const char *request = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
+char buffer[1024];
 
 struct spinlock socketlock;
 
@@ -34,6 +37,37 @@ tcp_error(void* arg, err_t err) {
   wakeup(arg);
 }
 
+err_t
+tcp_recv_callback(void *arg, struct tcp_pcb *tcp_pcb, struct pbuf *p, err_t err)
+{
+    // Check if there is data in the buffer
+    if (p != NULL)
+    {
+        // Process the received data...
+        int length = p->len;
+        pbuf_copy_partial(p, buffer, length, 0);
+        printf("Received %d bytes:\n", length);
+        printf("%s\n", buffer);
+
+        // Free the buffer
+        pbuf_free(p);
+    }
+
+    // Check if the transmission is complete
+    if (err == ERR_OK)
+    {
+        // Transmission is complete, print a message and close the control block
+        printf("Transmission complete\n");
+        tcp_close(tcp_pcb);
+    }
+    else
+    {
+        // Transmission failed, print an error message and close the control block
+        printf("Error receiving data from the server: %d\n", err);
+        tcp_close(tcp_pcb);
+    }
+    return err;
+}
 
 int
 tcpallinone(int i)
@@ -62,14 +96,21 @@ tcpallinone(int i)
   if (res == ERR_OK) {
     printf("Connect Success\n");
   }
-  sleep(&success, &socketlock);
 
-  if(tcp_close(pcb) == ERR_OK) {
-    printf("pcb closed\n");
-    release(&socketlock);
-    return 0;
-  } else {
-    release(&socketlock);
-    return -1;
-  };
+  // Send the request using the tcp_write() function
+  tcp_write(pcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
+
+  // Set the receive callback for the TCP control block using the tcp_recv() function
+  tcp_recv(pcb, tcp_recv_callback);
+
+
+  // if(tcp_close(pcb) == ERR_OK) {
+  //   printf("pcb closed\n");
+  //   release(&socketlock);
+  //   return 0;
+  // } else {
+  //   release(&socketlock);
+  //   return -1;
+  // };
+  return 0;
 }

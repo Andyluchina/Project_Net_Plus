@@ -388,10 +388,12 @@ int virtio_net_send(const void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
   if (DEBUGP) printf("sent len: %d\n", len);
-  while(transmitq.used_idx >= transmitq.used->idx){
-    // wait for queue to add something to used queue
-    *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1;
-  }
+  // while(transmitq.used_idx >= transmitq.used->idx){
+  //   // wait for queue to add something to used queue
+  // }
+  
+  // *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1;
+  if (DEBUGP) printf("notified: %d\n", len);
   transmitq.used_idx = transmitq.used->idx;
   free_chain_transmitq(idx[0]);
 
