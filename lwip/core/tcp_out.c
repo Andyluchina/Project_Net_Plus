@@ -1240,6 +1240,7 @@ tcp_output(struct tcp_pcb *pcb)
   u32_t wnd, snd_nxt;
   err_t err;
   struct netif *netif;
+  printf("Calling TCP output\n");
 #if TCP_CWND_DEBUG
   s16_t i = 0;
 #endif /* TCP_CWND_DEBUG */

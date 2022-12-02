@@ -3399,6 +3399,7 @@
  */
 #if !defined TCP_CWND_DEBUG || defined __DOXYGEN__
 #define TCP_CWND_DEBUG                  LWIP_DBG_OFF
+// #define TCP_CWND_DEBUG                  1
 #endif
 
 /**

@@ -10,7 +10,7 @@
 #include "proc.h"
 #include "virtio.h"
 
-#define DEBUGP 0
+#define DEBUGP 1
 #define TIMEP 0
 // the address of virtio mmio register r.
 #define R(r) ((volatile uint32 *)(VIRTIO1 + (r)))

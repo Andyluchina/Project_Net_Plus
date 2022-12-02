@@ -71,7 +71,7 @@
 /** flag for LWIP_DEBUGF to enable that debug message */
 #define LWIP_DBG_ON            0x80U
 /** flag for LWIP_DEBUGF to disable that debug message */
-#define LWIP_DBG_OFF           0x00U
+#define LWIP_DBG_OFF           0x80U
 /**
  * @}
  */

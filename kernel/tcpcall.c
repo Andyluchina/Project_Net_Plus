@@ -16,12 +16,24 @@
 
 #define CLOUDFAREIP "1.1.1.1"
 
+struct spinlock socketlock;
+
 // struct netif netif;
-err_t
+static err_t
 tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
   printf("TCP Connected!\n");
+  *(int *)arg = 0;
+  wakeup(arg);
   return ERR_OK;
 }
+
+static void
+tcp_error(void* arg, err_t err) {
+  printf("TCP Unsuccessful!\n");
+  *(int *)arg = 1;
+  wakeup(arg);
+}
+
 
 int
 tcpallinone(int i)
@@ -34,15 +46,30 @@ tcpallinone(int i)
     printf("IP Conversion Failed\n");
     return -1;
   }
-  u16_t port = 443;
-  tcp_connect(pcb, &ip, port, tcp_connected);
+  u16_t port = 80;
+  // tcp_err(pcb, tcp_connect);
+  // tcp_recv(pcb, tcp_connect);
+  // tcp_sent(pcb, tcp_connect);
+  acquire(&socketlock);
+
+  tcp_err_fn err_fn = tcp_error;
+  tcp_connected_fn suc_fn = tcp_connected;
+
+  int success = 1;
+  tcp_arg(pcb, &success);
+  tcp_err(pcb, err_fn);
+  err_t res = tcp_connect(pcb, &ip, port, suc_fn);
+  if (res == ERR_OK) {
+    printf("Connect Success\n");
+  }
+  sleep(&success, &socketlock);
 
   if(tcp_close(pcb) == ERR_OK) {
     printf("pcb closed\n");
+    release(&socketlock);
     return 0;
   } else {
+    release(&socketlock);
     return -1;
   };
-
-
 }
