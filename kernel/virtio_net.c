@@ -388,11 +388,14 @@ int virtio_net_send(const void *data, int len) {
   *R(VIRTIO_MMIO_QUEUE_SEL) = 1;
   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1; // value is queue number
   if (DEBUGP) printf("sent len: %d\n", len);
+  printf("%d, %d\n", transmitq.used_idx, transmitq.used->idx);
   // while(transmitq.used_idx >= transmitq.used->idx){
+  //   // printf(".");
+  //   *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1;
   //   // wait for queue to add something to used queue
   // }
+
   
-  // *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 1;
   if (DEBUGP) printf("notified: %d\n", len);
   transmitq.used_idx = transmitq.used->idx;
   free_chain_transmitq(idx[0]);
@@ -406,6 +409,7 @@ int virtio_net_send(const void *data, int len) {
 /* receive data; return the number of bytes received */
 // Incoming (device writable) buffers are added to the receive virtqueue, and processed after they are used.
 int virtio_net_recv(void *data, int len) {
+  // if (DEBUGP) printf("Calling recieve\n");
 
   uint64 time_start =  *(uint64*)CLINT_MTIME;
 
@@ -440,7 +444,7 @@ int virtio_net_recv(void *data, int len) {
   // int counter = 0;
   while(receiveq.used_idx == receiveq.used->idx){
     // wait for queue to add something to used queue
-    *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
+    // *R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // value is queue number
     // counter++;
     // if(counter > 1000000){
     //   break;
@@ -467,4 +471,5 @@ int virtio_net_recv(void *data, int len) {
 
   if (TIMEP) printf(" virtio_net_recv EXIT: time elapsed %d\n", *(uint64*)CLINT_MTIME - time_start);
   return actual_len-12;
+  // return actual_len;
 }

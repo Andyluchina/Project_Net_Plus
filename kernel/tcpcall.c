@@ -15,7 +15,7 @@
 #include "lwip/tcp.h"
 #include "lwip/tcpbase.h"
 
-#define CLOUDFAREIP "1.1.1.1"
+#define CLOUDFAREIP "67.159.94.97"
 const char *request = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n";
 char buffer[1024];
 
@@ -24,7 +24,7 @@ struct spinlock socketlock;
 // struct netif netif;
 static err_t
 tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
-  printf("TCP Connected!\n");
+  printf("TCP Connected Function call!\n");
   *(int *)arg = 0;
   wakeup(arg);
   return ERR_OK;
@@ -33,7 +33,7 @@ tcp_connected(void *arg, struct tcp_pcb *tpcb, err_t err) {
 static void
 tcp_error(void* arg, err_t err) {
   printf("TCP Unsuccessful!\n");
-  *(int *)arg = 1;
+  *(int *)arg = 0;
   wakeup(arg);
 }
 
@@ -41,6 +41,7 @@ err_t
 tcp_recv_callback(void *arg, struct tcp_pcb *tcp_pcb, struct pbuf *p, err_t err)
 {
     // Check if there is data in the buffer
+    printf("Calling recv callback\n");
     if (p != NULL)
     {
         // Process the received data...
@@ -80,7 +81,7 @@ tcpallinone(int i)
     printf("IP Conversion Failed\n");
     return -1;
   }
-  u16_t port = 80;
+  u16_t port = 8877;
   // tcp_err(pcb, tcp_connect);
   // tcp_recv(pcb, tcp_connect);
   // tcp_sent(pcb, tcp_connect);
@@ -92,17 +93,20 @@ tcpallinone(int i)
   int success = 1;
   tcp_arg(pcb, &success);
   tcp_err(pcb, err_fn);
+  tcp_recv(pcb, tcp_recv_callback);
   err_t res = tcp_connect(pcb, &ip, port, suc_fn);
   if (res == ERR_OK) {
     printf("Connect Success\n");
   }
 
+  sleep(&success, &socketlock);
   // Send the request using the tcp_write() function
-  tcp_write(pcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
+  err_t write_succ = tcp_write(pcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
+  if (write_succ == ERR_OK) {
+    printf("TCP Write done\n");
+  }
 
-  // Set the receive callback for the TCP control block using the tcp_recv() function
-  tcp_recv(pcb, tcp_recv_callback);
-
+  release(&socketlock);
 
   // if(tcp_close(pcb) == ERR_OK) {
   //   printf("pcb closed\n");
